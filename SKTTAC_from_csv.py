@@ -60,7 +60,7 @@ hidden_cols = False
 
 # 2.0 - EXPORT Z HPSM, UPRAVENY UZ CEZ VBA SKRIPT -> CITATELNEJSIA FORMA
 df_hpsm = pd.read_excel(hpsm_input_path)
-print('Subor ' + hpsm_input_path + ' uspesne nacitany ...')
+print('Subor ' + hpsm_input_path + ' uspesne nacitany ... ')
 
 # 2.1.0 - korekcia exportu z HPSM - ID v kazdom riadku spravne (nahradenie NaN hodnot)
 idx = np.nan
