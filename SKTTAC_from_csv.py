@@ -52,10 +52,11 @@ def recognize_SLA_HPSM(str_sla):
 
 # 1.0 - NASTAVENIE PRISTUPOVYCH CIEST K SUBOROM + INE
 # TODO - premysliet co bude lepsie - ci vyberat subor manualne, alebo prepisat v kode vzdy -> rychlejsie
-csv_input_path = os.path.join('SKTTAC_01_06_2020.csv')
-hpsm_input_path = os.path.join('Billien_202005_EMS.xlsx')
-report_path = os.path.join('TOIS_SLA_Report_2020-04_Interne_Vyhodnotenie_v4.xlsx')
-sht_name = 'TOIS všetky 04-2020'
+csv_input_path = os.path.join('SKTTAC_29_07_2020.csv')  # export z TLN JIRA napr 01/06/2020
+hpsm_input_path = os.path.join('Billien_202006_EMS.xlsx')  # data zo SKT za Billien za obdobie napr 05
+report_path = os.path.join(
+    'TOIS_SLA_Report_2020-05_Interne_Vyhodnotenie_v4.xlsx')  # report z minuleho mesiaca (napr 04)
+sht_name = 'TOIS všetky 05-2020'  # zvolit spravny sheet z minuleho mesiaca (napr 04)
 hidden_cols = False
 
 # 2.0 - EXPORT Z HPSM, UPRAVENY UZ CEZ VBA SKRIPT -> CITATELNEJSIA FORMA
@@ -85,21 +86,33 @@ for df_name, df_group in df_hpsm.groupby("Incident ID"):
     for index, values in df_group["SLT Name"].items():
         SLT_Breach = df_group.loc[index, 'SLT Breached']
         if recognize_SLA_HPSM(values) == 'L2O':
-            df_group_copy.loc[index, 'L2 Odozva Breach HPSM'] = SLT_Breach
+            df_group_copy.loc[:, 'L2 Odozva Breach HPSM'] = SLT_Breach
         elif recognize_SLA_HPSM(values) == 'L2R':
-            df_group_copy.loc[index, 'L2 Riesenie Breach HPSM'] = SLT_Breach
+            df_group_copy.loc[:, 'L2 Riesenie Breach HPSM'] = SLT_Breach
         elif recognize_SLA_HPSM(values) == 'L3O':
-            df_group_copy.loc[index, 'L3 Odozva Breach HPSM'] = SLT_Breach
+            df_group_copy.loc[:, 'L3 Odozva Breach HPSM'] = SLT_Breach
         elif recognize_SLA_HPSM(values) == 'L3R':
-            df_group_copy.loc[index, 'L3 Riesenie Breach HPSM'] = SLT_Breach
-        # TODO -> prilepit vsetky groupy za seba
+            df_group_copy.loc[:, 'L3 Riesenie Breach HPSM'] = SLT_Breach
 
+    df_breached_collected = df_breached_collected.append(df_group_copy, ignore_index=True)
+
+# 2.1.2 - pokial incident L3 a ma prazdne L2 polia -> default neporusenie SLA
+for index, values in df_breached_collected["L2 Odozva Breach HPSM"].items():
+    if df_breached_collected.loc[index, 'L3 Odozva Breach HPSM'] and \
+            df_breached_collected.loc[index, 'L3 Riesenie Breach HPSM']:
+        df_breached_collected.loc[index, "L2 Odozva Breach HPSM"] = "Nie"
+
+for index, values in df_breached_collected["L2 Riesenie Breach HPSM"].items():
+    if df_breached_collected.loc[index, 'L3 Odozva Breach HPSM'] and \
+            df_breached_collected.loc[index, 'L3 Riesenie Breach HPSM']:
+        df_breached_collected.loc[index, "L2 Riesenie Breach HPSM"] = "Nie"
 
 # TODO - DOPLNIT SLT BREACHED PRE VSETKY SLA CASY - AZ POTOM DELETE DUPLICATES
 # 2.2 - vyhodenie nepotrebnych stlpcov
 df_hpsm.drop('SLT Breached Next Month', axis=1, inplace=True)
-df_hpsm_new = df_hpsm.copy()
-df_hpsm_new.drop(['SLT Name', 'SLT Expiration time', 'SLT Total time\nd hh:mi:ss'], axis=1, inplace=True)
+df_hpsm_new = df_breached_collected.copy()
+df_hpsm_new.drop(['SLT Name', 'SLT Expiration time', 'SLT Total time\nd hh:mi:ss', 'Open Time',
+                  'Close Time', 'SLT Breached', 'SLT Breached Next Month'], axis=1, inplace=True)
 df_hpsm_new.drop_duplicates(subset='Incident ID', inplace=True, keep='first')
 
 # 2.2.1 - preindexovanie riadkov -> aby sa dal pouzit .loc neskor poporade v iteracii
@@ -176,9 +189,6 @@ df_hpsm_new.rename(columns={'Title': 'Title - HPSM',
                             'Status': 'Status - HPSM',
                             'L3 udrzba': 'L3 - HPSM',
                             'Is Outage': 'Outage - HPSM',
-                            'Open Time': 'Open Time - HPSM',
-                            'Close Time': 'Close Time - HPSM',
-                            'SLT Breached': 'SLT Breached - HPSM',
                             'SLT Start time': 'SLT Start time - HPSM',
                             }, inplace=True)
 
@@ -266,14 +276,17 @@ new_cols = ['Incident ID', 'Issue key - JIRA', 'Issue ID - JIRA',
             'P', 'Priority - HPSM', 'Priority - JIRA',
             'Status JIRA', 'Status - HPSM', 'Status - JIRA', 'Resolution - JIRA', 'Assignee - JIRA',
             'Assignee HPSM - JIRA',
-            'SLT Breached - HPSM', 'Assign Time', 'Open Time - HPSM', 'Created - JIRA', 'SLT Start time - HPSM',
+            'Assign Time', 'Created - JIRA', 'SLT Start time - HPSM',
             'Čas parametra S.2', 'L2 Odozva HPSM', 'L2 Odozva HPSM Total Time', 'Splnenie parametra S.2',
+            'L2 Odozva Breach HPSM',
             'Čas parametra S.3', 'L2 Riesenie HPSM', 'L2 Riesenie HPSM Total Time', 'Splnenie parametra S.3',
+            'L2 Riesenie Breach HPSM',
             'Čas parametra S.4', 'L3 Odozva HPSM', 'L3 Odozva HPSM Total Time', 'Splnenie parametra S.4',
+            'L3 Odozva Breach HPSM',
             'Čas parametra S.5', 'Splnenie parametra S.5',  # rovnake ako S.4 (L3 Odozva HPSM)
             'Čas parametra S.6', 'L3 Riesenie HPSM', 'L3 Riesenie HPSM Total Time', 'Splnenie parametra S.6',
+            'L3 Riesenie Breach HPSM',
             'Updated - JIRA', 'Last Viewed - JIRA', 'Resolved - JIRA',
-            'Close Time - HPSM',
             'Description - JIRA',
             'Duplicate - JIRA', 'Relation to - JIRA', 'Outage - HPSM',
             'HPSM Group - JIRA', 'HPSM Issue Type - JIRA',
@@ -319,8 +332,10 @@ for index, value in df_merged_all['Čas parametra S.6'].items():
         df_merged_all.loc[index, 'Čas parametra S.6'] = df_merged_all.loc[index, 'L3 Riesenie HPSM']
 
 # 3.8 - vyhodenie uzavretych incidentov z minulych obdobi
-for index, value in df_merged_all['Status JIRA'].items():
-    if value == 'Closed':
+for index, value in df_merged_all['Status JIRA'].items(): # data z interneho minulomesacneho reportu
+    if value == 'Closed' or (value is np.nan and df_merged_all.loc[index, 'Status - JIRA'] == 'Closed'):
+        # jednoduchy Closed ked uzatvoreny v minulom obdobi
+        # incident v exporte zo starsieho obdobia = bez stavu reporte, JIRA vsak detekuje uzavretie
         df_merged_all.drop(labels=index, inplace=True, axis=0)
 
 # 3.9 - update JIRA stavov -> kontrola ci je co updatenut, potom update
