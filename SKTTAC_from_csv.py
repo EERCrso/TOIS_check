@@ -8,7 +8,6 @@ import datetime as dt
 import xlrd
 import openpyxl as opx
 from openpyxl.utils import get_column_letter
-import copy
 
 
 def excel_date(date1):
@@ -351,16 +350,39 @@ for index, value in df_merged_all['Status - JIRA'].items():
 
 # 4.0 - ulozit do .xlsx pre rychly pristup + kontrolu, predtym konverzia na casovy format excelu
 excel_report_name = 'TOIS_report_created_' + dt.datetime.now().strftime("%Y%m%d_%H_%M_%S") + '.xlsx'
+excel_report_name_short = 'TOIS_report_created_short_' + dt.datetime.now().strftime("%Y%m%d_%H_%M_%S") + '.xlsx'
 df_merged_all.to_excel(excel_report_name, index=False, sheet_name=sht_name, freeze_panes=(1, 1))
 print("Report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...')
 
+# 4.1 - vytvorit skrateny excel len so stlpcami ako v internom reporte
+cols_extra = ['Issue key - JIRA', 'Issue ID - JIRA', 'L3 - HPSM', 'Label 1 - JIRA', 'Label 2 - JIRA', 'Label 3 - JIRA',
+              'Priority - HPSM', 'Priority - JIRA', 'Status - HPSM', 'Status - JIRA', 'Resolution - JIRA',
+              'Assignee - JIRA', 'Assignee HPSM - JIRA', 'Created - JIRA', 'SLT Start time - HPSM',
+              'L2 Odozva HPSM', 'L2 Odozva HPSM Total Time', 'L2 Odozva Breach HPSM',
+              'L2 Riesenie HPSM', 'L2 Riesenie HPSM Total Time', 'L2 Riesenie Breach HPSM',
+              'L3 Odozva HPSM', 'L3 Odozva HPSM Total Time', 'L3 Odozva Breach HPSM',
+              'L3 Riesenie HPSM', 'L3 Riesenie HPSM Total Time', 'L3 Riesenie Breach HPSM',
+              'Updated - JIRA', 'Last Viewed - JIRA', 'Resolved - JIRA', 'Description - JIRA',
+              'Duplicate - JIRA', 'Relation to - JIRA', 'Outage - HPSM', 'HPSM Group - JIRA',
+              'HPSM Issue Type - JIRA', 'MEV ID - JIRA', 'Module - JIRA', 'Open-Closed Time - JIRA',
+              'Open-Resolved Time - JIRA', 'Reopen Counter - JIRA', 'Test Environment - JIRA']
+df_merged_all_short = df_merged_all.drop(cols_extra, axis=1, inplace=True)
+df_merged_all.to_excel(excel_report_name_short, index=False, sheet_name=sht_name, freeze_panes=(1, 1))
+print("Skrateny report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...')
+
+
 # 5.0 - spracovanie vytvoreneho .xlsx spojeneho reportu // opx = openpyxl -> nastroj na pracovanie s xlsx
 workbook = opx.load_workbook(filename=excel_report_name)
+workbook_short = opx.load_workbook(filename=excel_report_name_short)
 sheet = workbook.active
+sheet_short = workbook_short.active
 
 # 5.1 - nastavenie auto filtra + autofit sirky buniek
 sheet.auto_filter.ref = "A:BE"
 auto_format_cell_width(sheet)
+
+sheet_short.auto_filter.ref = "A:P"
+auto_format_cell_width(sheet_short)
 
 # 5.2 - skryt pomocne stlpce??
 if hidden_cols:  # nastavenie na zaciatku skriptu
@@ -377,6 +399,7 @@ if hidden_cols:  # nastavenie na zaciatku skriptu
 
 # 5.X - ulozit subor
 workbook.save(filename=excel_report_name)
+workbook_short.save(filename=excel_report_name_short)
 print('Zakladne upravy v spojenom reporte uspesne zrealizovane ...')
 
 # TODO - filter na zaklade zaciatocneho eDZ - case insensitive?
