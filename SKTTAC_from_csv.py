@@ -1,52 +1,13 @@
+import dateutil
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import os
-import openpyxl
-import sqlite3
 import datetime as dt
-import xlrd
 import openpyxl as opx
-from openpyxl.utils import get_column_letter
-
-
-def excel_date(date1):
-    """
-    funkcia konvertuje casovy format z pythonu do excelu (len cele cislo)
-    :param date1: datum+cas na konverziu v python formate datetime
-    :return: skonvertovany datum+cas v excel formate
-    """
-    temp = dt.datetime(1899, 12, 30)  # Note, not 31st Dec but 30th!
-    delta = date1 - temp
-    return float(delta.days) + (float(delta.seconds) / 86400)
-
-
-def auto_format_cell_width(ws):
-    for letter in range(1, ws.max_column):
-        maximum_value = 0
-        for cell in ws[get_column_letter(letter)]:
-            val_to_check = len(str(cell.value))
-            if val_to_check > maximum_value:
-                maximum_value = val_to_check
-        ws.column_dimensions[get_column_letter(letter)].width = maximum_value + 1
-
-
-def recognize_SLA_HPSM(str_sla):
-    """
-    :param str_sla: string, ktory je standardom pre HPSM automaticky generovane reporty
-    v stlpci "SLT Name"
-    :return: L2/L3 + O/R
-    """
-    if "odozvy" in str_sla:
-        if "L3" in str_sla:
-            return "L3O"
-        else:
-            return "L2O"
-    else:  # riesenia
-        if "L3" in str_sla:
-            return "L3R"
-        else:
-            return "L2R"
+import aux_functions
+import workdays as wd
+from pandas.tseries.offsets import BDay
+import dateutil as du
 
 
 # 1.0 - NASTAVENIE PRISTUPOVYCH CIEST K SUBOROM + INE
@@ -57,6 +18,7 @@ report_path = os.path.join(
     'TOIS_SLA_Report_2020-05_Interne_Vyhodnotenie_v4.xlsx')  # report z minuleho mesiaca (napr 04)
 sht_name = 'TOIS všetky 05-2020'  # zvolit spravny sheet z minuleho mesiaca (napr 04)
 hidden_cols = False
+report_month = 6
 
 # 2.0 - EXPORT Z HPSM, UPRAVENY UZ CEZ VBA SKRIPT -> CITATELNEJSIA FORMA
 df_hpsm = pd.read_excel(hpsm_input_path)
@@ -84,13 +46,13 @@ for df_name, df_group in df_hpsm.groupby("Incident ID"):
     df_group_copy = df_group.copy()
     for index, values in df_group["SLT Name"].items():
         SLT_Breach = df_group.loc[index, 'SLT Breached']
-        if recognize_SLA_HPSM(values) == 'L2O':
+        if aux_functions.recognize_SLA_HPSM(values) == 'L2O':
             df_group_copy.loc[:, 'L2 Odozva Breach HPSM'] = SLT_Breach
-        elif recognize_SLA_HPSM(values) == 'L2R':
+        elif aux_functions.recognize_SLA_HPSM(values) == 'L2R':
             df_group_copy.loc[:, 'L2 Riesenie Breach HPSM'] = SLT_Breach
-        elif recognize_SLA_HPSM(values) == 'L3O':
+        elif aux_functions.recognize_SLA_HPSM(values) == 'L3O':
             df_group_copy.loc[:, 'L3 Odozva Breach HPSM'] = SLT_Breach
-        elif recognize_SLA_HPSM(values) == 'L3R':
+        elif aux_functions.recognize_SLA_HPSM(values) == 'L3R':
             df_group_copy.loc[:, 'L3 Riesenie Breach HPSM'] = SLT_Breach
 
     df_breached_collected = df_breached_collected.append(df_group_copy, ignore_index=True)
@@ -310,28 +272,38 @@ for index, value in df_merged_all['P'].items():
         df_merged_all.loc[index, 'P'] = df_merged_all.loc[index, 'Priority - HPSM']
 
 for index, value in df_merged_all['Assign Time'].items():
-    if value is pd.NaT:
+    if pd.isnull(value):  # kontrola ci je NaT
         df_merged_all.loc[index, 'Assign Time'] = df_merged_all.loc[index, 'SLT Start time - HPSM']
 
-for index, value in df_merged_all['Čas parametra S.2'].items():
-    if value is pd.NaT:
-        df_merged_all.loc[index, 'Čas parametra S.2'] = df_merged_all.loc[index, 'L2 Odozva HPSM']
+report_cols = ['Čas parametra S.2', 'Splnenie parametra S.2',
+               'Čas parametra S.3', 'Splnenie parametra S.3',
+               'Čas parametra S.4', 'Splnenie parametra S.4',
+               'Čas parametra S.5', 'Splnenie parametra S.5',
+               'Čas parametra S.6', 'Splnenie parametra S.6']
+report_cols_extra = ['L2 Odozva HPSM', 'L2 Odozva Breach HPSM',  # S2
+                     'L2 Riesenie HPSM', 'L2 Riesenie Breach HPSM',  # S3
+                     'L3 Odozva HPSM', 'L3 Odozva Breach HPSM',  # S4
+                     'L3 Odozva HPSM', 'L3 Odozva Breach HPSM',  # S5 - rovnake ako S4
+                     'L3 Riesenie HPSM', 'L3 Riesenie Breach HPSM']  # S6
+breached_hpsm_cols = ['L2 Odozva Breach HPSM', 'L2 Riesenie Breach HPSM',
+                      'L3 Odozva Breach HPSM', 'L3 Odozva Breach HPSM',
+                      'L3 Riesenie Breach HPSM']
 
-for index, value in df_merged_all['Čas parametra S.3'].items():
-    if value is pd.NaT:
-        df_merged_all.loc[index, 'Čas parametra S.3'] = df_merged_all.loc[index, 'L2 Riesenie HPSM']
+# prehodenie logiky HPSM Breached
+for index_breached, value_breached in enumerate(breached_hpsm_cols):
+    for index, value in df_merged_all[value_breached].items():
+        if value == 'Nie':
+            df_merged_all.loc[index, value_breached] = 'Áno'
+        elif value == 'Áno':
+            df_merged_all.loc[index, value_breached] = 'Nie'
 
-for index, value in df_merged_all['Čas parametra S.4'].items():
-    if value is pd.NaT:
-        df_merged_all.loc[index, 'Čas parametra S.4'] = df_merged_all.loc[index, 'L3 Odozva HPSM']
-        df_merged_all.loc[index, 'Čas parametra S.5'] = df_merged_all.loc[index, 'L3 Odozva HPSM']
-
-for index, value in df_merged_all['Čas parametra S.6'].items():
-    if value is pd.NaT:
-        df_merged_all.loc[index, 'Čas parametra S.6'] = df_merged_all.loc[index, 'L3 Riesenie HPSM']
+for index_rep_col, value_rep_col in enumerate(report_cols):  # iterovanie cez zoznamy hore
+    for index, value in df_merged_all[value_rep_col].items():
+        if value is np.nan:
+            df_merged_all.loc[index, value_rep_col] = df_merged_all.loc[index, report_cols_extra[index_rep_col]]
 
 # 3.8 - vyhodenie uzavretych incidentov z minulych obdobi
-for index, value in df_merged_all['Status JIRA'].items(): # data z interneho minulomesacneho reportu
+for index, value in df_merged_all['Status JIRA'].items():  # data z interneho minulomesacneho reportu
     if value == 'Closed' or (value is np.nan and df_merged_all.loc[index, 'Status - JIRA'] == 'Closed'):
         # jednoduchy Closed ked uzatvoreny v minulom obdobi
         # incident v exporte zo starsieho obdobia = bez stavu reporte, JIRA vsak detekuje uzavretie
@@ -347,6 +319,45 @@ for index, value in df_merged_all['Status - JIRA'].items():
             df_merged_all.loc[index, 'Status - JIRA'] = 'RFT'
         # update stavu
         df_merged_all.loc[index, 'Status JIRA'] = df_merged_all.loc[index, 'Status - JIRA']
+
+# 3.10 - vyznacenie uz vyhodnotenych incidentov z minulych mesiacov + doplnenie prazdnych casov
+for index_rep_col, value_rep_col in enumerate(report_cols[::2]):  # iterovanie cez zoznamy hore
+    for index, value in df_merged_all[value_rep_col].items():
+        if value != 'už vyhodnotené' and value:
+            if value.month < report_month and \
+                    ((value_rep_col != 'Čas parametra S.3' and df_merged_all.loc[index, 'Group'] == 'Tollnet') or
+                     (value_rep_col != 'Čas parametra S.6' and df_merged_all.loc[index, 'Group'] == 'Tollnet L3')):
+                df_merged_all.loc[index, value_rep_col] = 'už vyhodnotené'
+                df_merged_all.loc[index, report_cols[index_rep_col]] = 'už vyhodnotené'
+
+            # doplnenie prazdnych casov na zaklade SLA dat z excelu
+            if not value:
+                if value_rep_col == 'Čas parametra S.2':
+                    # najdenie hodnoty a jednotky casu
+                    if df_merged_all.loc[index, 'Group'] == 'Tollnet':
+                        time_add = aux_functions.get_TOIS_SLA(df_merged_all.loc[index, 'P'], 'L2O')
+                    else:
+                        time_add = aux_functions.get_TOIS_SLA(df_merged_all.loc[index, 'P'], 'L3O')
+
+                    # predefinovanie do formatu datetime
+                    assign_time = df_merged_all.loc[index, 'Assign Time']
+                    if time_add[1] == 'min':
+                        df_merged_all.loc[index, value_rep_col] = assign_time + dt.timedelta(minutes=time_add[0])
+                    elif time_add[1] == 'h':
+                        df_merged_all.loc[index, value_rep_col] = assign_time + dt.timedelta(hours=time_add[0])
+                    elif time_add[1] == 'day':
+                        df_merged_all.loc[index, value_rep_col] = assign_time + dt.timedelta(days=time_add[0])
+                    elif time_add[1] == 'workday':
+                        df_merged_all.loc[index, value_rep_col] = wd.workday(assign_time, time_add[0])
+                        # TODO - doplnit zoznam sviatkov
+                    elif time_add[1] == 'BD':
+                        # TODO - manualne nastavit business day ako workday vzdy do 17:00
+                    elif time_add[1] == 'month':
+                        # TODO - nastavit cez python-dateutil
+
+                    # default SLA splnene
+                    df_merged_all.loc[index, report_cols[index_rep_col]] = 'Áno'
+
 
 # 4.0 - ulozit do .xlsx pre rychly pristup + kontrolu, predtym konverzia na casovy format excelu
 excel_report_name = 'TOIS_report_created_' + dt.datetime.now().strftime("%Y%m%d_%H_%M_%S") + '.xlsx'
@@ -370,7 +381,6 @@ df_merged_all_short = df_merged_all.drop(cols_extra, axis=1, inplace=True)
 df_merged_all.to_excel(excel_report_name_short, index=False, sheet_name=sht_name, freeze_panes=(1, 1))
 print("Skrateny report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...')
 
-
 # 5.0 - spracovanie vytvoreneho .xlsx spojeneho reportu // opx = openpyxl -> nastroj na pracovanie s xlsx
 workbook = opx.load_workbook(filename=excel_report_name)
 workbook_short = opx.load_workbook(filename=excel_report_name_short)
@@ -379,10 +389,10 @@ sheet_short = workbook_short.active
 
 # 5.1 - nastavenie auto filtra + autofit sirky buniek
 sheet.auto_filter.ref = "A:BE"
-auto_format_cell_width(sheet)
+aux_functions.auto_format_cell_width(sheet)
 
 sheet_short.auto_filter.ref = "A:P"
-auto_format_cell_width(sheet_short)
+aux_functions.auto_format_cell_width(sheet_short)
 
 # 5.2 - skryt pomocne stlpce??
 if hidden_cols:  # nastavenie na zaciatku skriptu
