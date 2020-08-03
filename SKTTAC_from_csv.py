@@ -351,8 +351,10 @@ for index_rep_col, value_rep_col in enumerate(report_cols[::2]):  # iterovanie c
                         df_merged_all.loc[index, value_rep_col] = wd.workday(assign_time, time_add[0])
                         # TODO - doplnit zoznam sviatkov
                     elif time_add[1] == 'BD':
+                        pass
                         # TODO - manualne nastavit business day ako workday vzdy do 17:00
                     elif time_add[1] == 'month':
+                        pass
                         # TODO - nastavit cez python-dateutil
 
                     # default SLA splnene
