@@ -1,5 +1,4 @@
 import pandas as pd
-import aux_functions
 import workdays as wd
 from dateutil.relativedelta import *
 import PySimpleGUI as sg
@@ -7,7 +6,9 @@ import openpyxl as opx
 import datetime as dt
 import numpy as np
 from openpyxl.utils import get_column_letter
-import pkg_resources.py2_warn
+
+# DO TERMINALU NA KOMPILACIU .EXE
+# pyinstaller --hidden-import=pkg_resources.py2_warn --onefile --debug main_merge.py
 
 
 def get_TOIS_SLA(prio, code):
@@ -463,9 +464,9 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
                     if value_rep_col == 'Čas parametra S.2':
                         # najdenie hodnoty a jednotky casu
                         if df_merged_all.loc[index, 'Group'] == 'Tollnet':
-                            time_add = aux_functions.get_TOIS_SLA(df_merged_all.loc[index, 'P'], 'L2O')
+                            time_add = get_TOIS_SLA(df_merged_all.loc[index, 'P'], 'L2O')
                         else:
-                            time_add = aux_functions.get_TOIS_SLA(df_merged_all.loc[index, 'P'], 'L3O')
+                            time_add = get_TOIS_SLA(df_merged_all.loc[index, 'P'], 'L3O')
 
                         # predefinovanie do formatu datetime
                         assign_time = df_merged_all.loc[index, 'Assign Time']
@@ -525,10 +526,10 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
 
     # 5.1 - nastavenie auto filtra + autofit sirky buniek
     sheet.auto_filter.ref = "A:BE"
-    aux_functions.auto_format_cell_width(sheet)
+    auto_format_cell_width(sheet)
 
     sheet_short.auto_filter.ref = "A:P"
-    aux_functions.auto_format_cell_width(sheet_short)
+    auto_format_cell_width(sheet_short)
 
     # 5.2 - skryt pomocne stlpce??
     if hidden_cols:  # nastavenie na zaciatku skriptu
