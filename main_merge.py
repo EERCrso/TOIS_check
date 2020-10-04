@@ -148,7 +148,7 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
 
     for df_name, df_group in df_hpsm.groupby("Incident ID"):
         df_group_copy = df_group.copy()
-        for index, values in df_group["SLT Name"].items():
+        for index, values_loop in df_group["SLT Name"].items():
             SLT_Breach = df_group.loc[index, 'SLT Breached']
             if recognize_SLA_HPSM(values) == 'L2O':
                 df_group_copy.loc[:, 'L2 Odozva Breach HPSM'] = SLT_Breach
@@ -162,12 +162,12 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
         df_breached_collected = df_breached_collected.append(df_group_copy, ignore_index=True)
 
     # 2.1.2 - pokial incident L3 a ma prazdne L2 polia -> default neporusenie SLA
-    for index, values in df_breached_collected["L2 Odozva Breach HPSM"].items():
+    for index, values_loop in df_breached_collected["L2 Odozva Breach HPSM"].items():
         if df_breached_collected.loc[index, 'L3 Odozva Breach HPSM'] and \
                 df_breached_collected.loc[index, 'L3 Riesenie Breach HPSM']:
             df_breached_collected.loc[index, "L2 Odozva Breach HPSM"] = "Nie"
 
-    for index, values in df_breached_collected["L2 Riesenie Breach HPSM"].items():
+    for index, values_loop in df_breached_collected["L2 Riesenie Breach HPSM"].items():
         if df_breached_collected.loc[index, 'L3 Odozva Breach HPSM'] and \
                 df_breached_collected.loc[index, 'L3 Riesenie Breach HPSM']:
             df_breached_collected.loc[index, "L2 Riesenie Breach HPSM"] = "Nie"
@@ -202,6 +202,7 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     L3_riesenie_total = np.nan
     hpsm_problems = []
 
+    # TODO - NEVYHLADAVA L3 RIESENIA !!!
     # 2.5 - Hladanie velicin na zaklade charakteristickych popisov v stlpci SLT Name, pre kazde IM
     group_rows = 0
     for id_name, id_group in df_hpsm.groupby('Incident ID'):
@@ -267,7 +268,8 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     # 3.0 - EXPORT -> TLN JIRA -> SKTTAC UPDATED IN 6 MONTHS -> EXPORT AS .CSV (delimiter = ;)
     used_cols = ['Issue id', 'Issue key', 'Summary', 'Issue Type',
                  'Status', 'Priority', 'Created', 'Updated', 'Resolved',
-                 'Labels', 'Labels.1', 'Labels.2', 'Resolution', 'Assignee', 'Last Viewed',
+                 'Labels',  # 'Labels.1', 'Labels.2', -> v poslednom exporte zo SKT neboli!!!
+                 'Resolution', 'Assignee', 'Last Viewed',
                  'Description', 'Outward issue link (Duplicate)', 'Outward issue link (Relation )']
     custom_field_cols = ['Custom field (Ext ID)', 'Custom field (HPSM_Assigment_Group)',
                          'Custom field (HPSM_Assignee)', 'Custom field (HpsmIssueType)',
@@ -290,8 +292,8 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
                            'Updated': 'Updated - JIRA',
                            'Resolved': 'Resolved - JIRA',
                            'Labels': 'Label 1 - JIRA',
-                           'Labels.1': 'Label 2 - JIRA',
-                           'Labels.2': 'Label 3 - JIRA',
+                           # 'Labels.1': 'Label 2 - JIRA',
+                           # 'Labels.2': 'Label 3 - JIRA',
                            'Resolution': 'Resolution - JIRA',
                            'Assignee': 'Assignee - JIRA',
                            'Last Viewed': 'Last Viewed - JIRA',
@@ -346,7 +348,8 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     # 3.5 - zoradenie stlpcov - lepsia kontrola neskor
     new_cols = ['Incident ID', 'Issue key - JIRA', 'Issue ID - JIRA',
                 'Title',
-                'Group', 'L3 - HPSM', 'Label 1 - JIRA', 'Label 2 - JIRA', 'Label 3 - JIRA',
+                'Group', 'L3 - HPSM',
+                'Label 1 - JIRA',  # 'Label 2 - JIRA', 'Label 3 - JIRA',
                 'P', 'Priority - HPSM', 'Priority - JIRA',
                 'Status JIRA', 'Status - HPSM', 'Status - JIRA', 'Resolution - JIRA', 'Assignee - JIRA',
                 'Assignee HPSM - JIRA',
@@ -415,12 +418,15 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
             if value is np.nan:
                 df_merged_all.loc[index, value_rep_col] = df_merged_all.loc[index, report_cols_extra[index_rep_col]]
 
-    # 3.8 - vyhodenie uzavretych incidentov z minulych obdobi
-    for index, value in df_merged_all['Status JIRA'].items():  # data z interneho minulomesacneho reportu
-        if value == 'Closed' or (value is np.nan and df_merged_all.loc[index, 'Status - JIRA'] == 'Closed'):
-            # jednoduchy Closed ked uzatvoreny v minulom obdobi
-            # incident v exporte zo starsieho obdobia = bez stavu reporte, JIRA vsak detekuje uzavretie
-            df_merged_all.drop(labels=index, inplace=True, axis=0)
+    # TODO - vyhadzuje aj aktualne uzavrete incidenty, TREBA FIX
+    # TODO - dodany incideny je aj "RELEASED" nielen Closed
+    # TODO - vyriesit ako zistit aby nebol jeden incident reportovany vo viacerych mesiacoch ako uzavrety
+    # # 3.8 - vyhodenie uzavretych incidentov z minulych obdobi
+    # for index, value in df_merged_all['Status JIRA'].items():  # data z interneho minulomesacneho reportu
+    #     if value == 'Closed' or (value is np.nan and df_merged_all.loc[index, 'Status - JIRA'] == 'Closed'):
+    #         # jednoduchy Closed ked uzatvoreny v minulom obdobi
+    #         # incident v exporte zo starsieho obdobia = bez stavu reporte, JIRA vsak detekuje uzavretie
+    #         df_merged_all.drop(labels=index, inplace=True, axis=0)
 
     # 3.9 - update JIRA stavov -> kontrola ci je co updatenut, potom update
     for index, value in df_merged_all['Status - JIRA'].items():
@@ -500,8 +506,8 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
         window['MLINE'].update("Report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...\n', append=True)
 
     # 4.1 - vytvorit skrateny excel len so stlpcami ako v internom reporte
-    cols_extra = ['Issue key - JIRA', 'Issue ID - JIRA', 'L3 - HPSM', 'Label 1 - JIRA', 'Label 2 - JIRA',
-                  'Label 3 - JIRA',
+    cols_extra = ['Issue key - JIRA', 'Issue ID - JIRA', 'L3 - HPSM',
+                  'Label 1 - JIRA',  # 'Label 2 - JIRA', 'Label 3 - JIRA',
                   'Priority - HPSM', 'Priority - JIRA', 'Status - HPSM', 'Status - JIRA', 'Resolution - JIRA',
                   'Assignee - JIRA', 'Assignee HPSM - JIRA', 'Created - JIRA', 'SLT Start time - HPSM',
                   'L2 Odozva HPSM', 'L2 Odozva HPSM Total Time', 'L2 Odozva Breach HPSM',
