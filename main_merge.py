@@ -506,7 +506,7 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
         window['MLINE'].update("Report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...\n', append=True)
 
     # 4.1 - vytvorit skrateny excel len so stlpcami ako v internom reporte
-    cols_extra = ['Issue key - JIRA', 'Issue ID - JIRA', 'L3 - HPSM',
+    cols_extra = ['Issue ID - JIRA', 'L3 - HPSM', # 'Issue key - JIRA',
                   'Label 1 - JIRA',  # 'Label 2 - JIRA', 'Label 3 - JIRA',
                   'Priority - HPSM', 'Priority - JIRA', 'Status - HPSM', 'Status - JIRA', 'Resolution - JIRA',
                   'Assignee - JIRA', 'Assignee HPSM - JIRA', 'Created - JIRA', 'SLT Start time - HPSM',
@@ -518,8 +518,8 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
                   'Duplicate - JIRA', 'Relation to - JIRA', 'Outage - HPSM', 'HPSM Group - JIRA',
                   'HPSM Issue Type - JIRA', 'MEV ID - JIRA', 'Module - JIRA', 'Open-Closed Time - JIRA',
                   'Open-Resolved Time - JIRA', 'Reopen Counter - JIRA', 'Test Environment - JIRA']
-    df_merged_all_short = df_merged_all.drop(cols_extra, axis=1, inplace=True)
-    df_merged_all.to_excel(excel_report_name_short, index=False, sheet_name=sht_name, freeze_panes=(1, 1))
+    df_merged_all_short = df_merged_all.drop(cols_extra, axis=1)
+    df_merged_all_short.to_excel(excel_report_name_short, index=False, sheet_name=sht_name, freeze_panes=(1, 1))
     print("Skrateny report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...')
     if to_gui:
         window['MLINE'].update("Skrateny report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...\n', append=True)
@@ -534,7 +534,7 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     sheet.auto_filter.ref = "A:BE"
     auto_format_cell_width(sheet)
 
-    sheet_short.auto_filter.ref = "A:P"
+    sheet_short.auto_filter.ref = "A:Q"
     auto_format_cell_width(sheet_short)
 
     # 5.2 - skryt pomocne stlpce??
