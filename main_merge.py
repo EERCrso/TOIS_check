@@ -567,7 +567,7 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
 sg.change_look_and_feel('Dark Blue 3')  # please make your windows colorful
 
 layout = [
-    [sg.FileBrowse('Load Report', size=(10, 1), file_types=(("Excel Files", ".xlsx"),)), sg.Input(key='path_report')],
+    [sg.FileBrowse('Load Report', size=(10, 1), file_types=(("Excel Files", ".xlsm"),)), sg.Input(key='path_report')],
     [sg.Button('Sheet Name', size=(10, 1)), sg.InputText(key='sheet_report')],
     [sg.FileBrowse('Load JIRA', size=(10, 1), file_types=(("CSV Files", ".csv"),)), sg.Input(key='path_JIRA')],
     [sg.FileBrowse('Load HPSM', size=(10, 1), file_types=(("Excel Files", ".xlsx"),)), sg.Input(key='path_HPSM')],
