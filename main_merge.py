@@ -326,6 +326,18 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
         if value is np.nan:
             df_csv.loc[index, 'Custom field (Ext ID)'] = df_csv.loc[index, 'Summary - JIRA'][:8]
 
+    # 3.3.1 - vytvorit zoznam incidentov otvorenych v reportovanom mesiaci a neskor
+    opened_recently = dt.datetime(year=int(report_year), month=int(report_month), day=1)
+    df_csv_recent = df_csv[df_csv['Created - JIRA'] > opened_recently]
+
+    # 3.3.2 - vyhodit vsetky incidenty co maju "Module - JIRA" == "EV", "MEV (Service)", "Other" alebo
+    # "HPSM Group - JIRA" == Dispecing
+    mask = df_csv_recent['Module - JIRA'].isin(['EV', 'MEV (Service)', 'Other'])
+    df_csv_recent = df_csv_recent[~mask]
+    df_csv_recent.drop(df_csv_recent[df_csv_recent['HPSM Group - JIRA'] == 'Dispečing'].index,
+                       inplace=True)
+    df_csv_recent.to_excel('kontrola_JIRA_' + dt.datetime.now().strftime("%Y%m%d_%H_%M_%S") + '.xlsx')
+
     # 3.4 - merge do spolocneho excelu JIRA + HPSM + report
     df_report = pd.read_excel(report_path, sheet_name=sht_name)
     df_merged_report = pd.merge(df_report, df_hpsm_new, how='outer',
@@ -454,48 +466,48 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
 
     workbook_sviatky.close()
 
-    # TODO - SKONTROLOVAT CI POCITA SPRAVNE
-    # 3.10.2 - vyznacenie uz vyhodnotenych incidentov z minulych mesiacov + doplnenie prazdnych casov
-    for index_rep_col, value_rep_col in enumerate(report_cols[::2]):  # iterovanie cez zoznamy hore
-        for index, value in df_merged_all[value_rep_col].items():
-            if value != 'už vyhodnotené' and value:
-                if value.month < int(report_month) and value.year < int(report_year) and \
-                        ((value_rep_col != 'Čas parametra S.3' and df_merged_all.loc[index, 'Group'] == 'Tollnet') or
-                         (value_rep_col != 'Čas parametra S.6' and df_merged_all.loc[index, 'Group'] == 'Tollnet L3')):
-                    df_merged_all.loc[index, value_rep_col] = 'už vyhodnotené'
-                    df_merged_all.loc[index, report_cols[index_rep_col]] = 'už vyhodnotené'
-
-                # doplnenie prazdnych casov na zaklade SLA dat z excelu
-                if not value:
-                    if value_rep_col == 'Čas parametra S.2':
-                        # najdenie hodnoty a jednotky casu
-                        if df_merged_all.loc[index, 'Group'] == 'Tollnet':
-                            time_add = get_TOIS_SLA(df_merged_all.loc[index, 'P'], 'L2O')
-                        else:
-                            time_add = get_TOIS_SLA(df_merged_all.loc[index, 'P'], 'L3O')
-
-                        # predefinovanie do formatu datetime
-                        assign_time = df_merged_all.loc[index, 'Assign Time']
-                        if time_add[1] == 'min':
-                            df_merged_all.loc[index, value_rep_col] = assign_time + relativedelta(minutes=time_add[0])
-                        elif time_add[1] == 'h':
-                            df_merged_all.loc[index, value_rep_col] = assign_time + relativedelta(hours=time_add[0])
-                        elif time_add[1] == 'day':
-                            df_merged_all.loc[index, value_rep_col] = assign_time + relativedelta(days=time_add[0])
-                        elif time_add[1] == 'workday':
-                            df_merged_all.loc[index, value_rep_col] = wd.workday(assign_time, time_add[0], sviatky_list)
-                        elif time_add[1] == 'BD':
-                            pass
-                            # manualne nastavene business day ako workday vzdy do 17:00
-                            new_work_day = wd.workday(start_date=assign_time, days=time_add[0])
-                            new_business_day = new_work_day.replace(hour=17, minute=0, second=0)
-                            df_merged_all.loc[index, value_rep_col] = new_business_day
-                        elif time_add[1] == 'month':
-                            pass
-                            df_merged_all.loc[index, value_rep_col] = assign_time + relativedelta(months=time_add[0])
-
-                        # default SLA splnene
-                        df_merged_all.loc[index, report_cols[index_rep_col]] = 'Áno'
+    # # TODO - NEPOCITA SPRAVNE
+    # # 3.10.2 - vyznacenie uz vyhodnotenych incidentov z minulych mesiacov + doplnenie prazdnych casov
+    # for index_rep_col, value_rep_col in enumerate(report_cols[::2]):  # iterovanie cez zoznamy hore
+    #     for index, value in df_merged_all[value_rep_col].items():
+    #         if value != 'už vyhodnotené' and value:
+    #             if value.month < int(report_month) and value.year < int(report_year) and \
+    #                     ((value_rep_col != 'Čas parametra S.3' and df_merged_all.loc[index, 'Group'] == 'Tollnet') or
+    #                      (value_rep_col != 'Čas parametra S.6' and df_merged_all.loc[index, 'Group'] == 'Tollnet L3')):
+    #                 df_merged_all.loc[index, value_rep_col] = 'už vyhodnotené'
+    #                 df_merged_all.loc[index, report_cols[index_rep_col]] = 'už vyhodnotené'
+    #
+    #             # doplnenie prazdnych casov na zaklade SLA dat z excelu
+    #             if not value:
+    #                 if value_rep_col == 'Čas parametra S.2':
+    #                     # najdenie hodnoty a jednotky casu
+    #                     if df_merged_all.loc[index, 'Group'] == 'Tollnet':
+    #                         time_add = get_TOIS_SLA(df_merged_all.loc[index, 'P'], 'L2O')
+    #                     else:
+    #                         time_add = get_TOIS_SLA(df_merged_all.loc[index, 'P'], 'L3O')
+    #
+    #                     # predefinovanie do formatu datetime
+    #                     assign_time = df_merged_all.loc[index, 'Assign Time']
+    #                     if time_add[1] == 'min':
+    #                         df_merged_all.loc[index, value_rep_col] = assign_time + relativedelta(minutes=time_add[0])
+    #                     elif time_add[1] == 'h':
+    #                         df_merged_all.loc[index, value_rep_col] = assign_time + relativedelta(hours=time_add[0])
+    #                     elif time_add[1] == 'day':
+    #                         df_merged_all.loc[index, value_rep_col] = assign_time + relativedelta(days=time_add[0])
+    #                     elif time_add[1] == 'workday':
+    #                         df_merged_all.loc[index, value_rep_col] = wd.workday(assign_time, time_add[0], sviatky_list)
+    #                     elif time_add[1] == 'BD':
+    #                         pass
+    #                         # manualne nastavene business day ako workday vzdy do 17:00
+    #                         new_work_day = wd.workday(start_date=assign_time, days=time_add[0])
+    #                         new_business_day = new_work_day.replace(hour=17, minute=0, second=0)
+    #                         df_merged_all.loc[index, value_rep_col] = new_business_day
+    #                     elif time_add[1] == 'month':
+    #                         pass
+    #                         df_merged_all.loc[index, value_rep_col] = assign_time + relativedelta(months=time_add[0])
+    #
+    #                     # default SLA splnene
+    #                     df_merged_all.loc[index, report_cols[index_rep_col]] = 'Áno'
 
     # 4.0 - ulozit do .xlsx pre rychly pristup + kontrolu, predtym konverzia na casovy format excelu
     excel_report_name = 'TOIS_report_created_' + dt.datetime.now().strftime("%Y%m%d_%H_%M_%S") + '.xlsx'
@@ -566,6 +578,9 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
 # VOLANIE GUI
 sg.change_look_and_feel('Dark Blue 3')  # please make your windows colorful
 
+# DEBUG MODE - natvrdo adresy suborov v kode po stlaceni tlacidla "RUN"
+debug = False
+
 layout = [
     [sg.FileBrowse('Load Report', size=(10, 1), file_types=(("Excel Files", ".xlsm"),)), sg.Input(key='path_report')],
     [sg.Button('Sheet Name', size=(10, 1)), sg.InputText(key='sheet_report')],
@@ -592,25 +607,50 @@ while True:  # Event Loop
         window['report_month'].update(int(workbook_report.active.title[-6:-5]) + 1)
 
     if event == 'RUN':
-        if values['path_report'] and values['sheet_report'] and values['path_JIRA']:
-            if values['path_HPSM'] and values['report_year'] and values['report_month']:
 
-                reports = merge_exports(report_path=values['path_report'],
-                                        sht_name=values['sheet_report'],
-                                        csv_input_path=values['path_JIRA'],
-                                        hpsm_input_path=values['path_HPSM'],
-                                        report_year=values['report_year'],
-                                        report_month=values['report_month'])
-                sg.popup_ok('Reporty uspesne vytvorene!', text_color='black', no_titlebar=True)
-                window['MLINE'].update('Finalne reporty:\n', append=True)
-                window['MLINE'].update(reports[0] + '\n', append=True)
-                window['MLINE'].update(reports[1] + '\n', append=True)
+        if debug:
+            # testing - 3.2.2021
+            report_path = 'C:/Users/Matej Cenky/Desktop/SLA-Skytoll-Report-01-2021/TOIS/' \
+                          'TOIS_SLA_Report_2021-01_Interne_Vyhodnotenie_v4.xlsm'
+            sht_name = 'TOIS všetky 12-2020'
+            csv_input_path = 'C:/Users/Matej Cenky/Desktop/SLA-Skytoll-Report-01-2021/TOIS/' \
+                             'SKTTAC - Updated Last 6 Months (Tollnet a.s. Task Manager) 2021-02-01T00 17 22+0100.csv'
+            hpsm_input_path = 'C:/Users/Matej Cenky/Desktop/SLA-Skytoll-Report-01-2021/TOIS/' \
+                              'SLA_UC_report_01_2021_Billien_EMS-2.xlsx'
+            report_year = '2021'
+            report_month = '01'
 
+            reports = merge_exports(report_path=report_path,
+                                    sht_name=sht_name,
+                                    csv_input_path=csv_input_path,
+                                    hpsm_input_path=hpsm_input_path,
+                                    report_year=report_year,
+                                    report_month=report_month)
+            sg.popup_ok('Reporty uspesne vytvorene!', text_color='black', no_titlebar=True)
+            window['MLINE'].update('Finalne reporty:\n', append=True)
+            window['MLINE'].update(reports[0] + '\n', append=True)
+            window['MLINE'].update(reports[1] + '\n', append=True)
+
+        else:
+            if values['path_report'] and values['sheet_report'] and values['path_JIRA']:
+                if values['path_HPSM'] and values['report_year'] and values['report_month']:
+
+                    reports = merge_exports(report_path=values['path_report'],
+                                            sht_name=values['sheet_report'],
+                                            csv_input_path=values['path_JIRA'],
+                                            hpsm_input_path=values['path_HPSM'],
+                                            report_year=values['report_year'],
+                                            report_month=values['report_month'])
+                    sg.popup_ok('Reporty uspesne vytvorene!', text_color='black', no_titlebar=True)
+                    window['MLINE'].update('Finalne reporty:\n', append=True)
+                    window['MLINE'].update(reports[0] + '\n', append=True)
+                    window['MLINE'].update(reports[1] + '\n', append=True)
+
+                else:
+                    sg.popup_error('Nekompletne udaje - dopln a skus znova.',
+                                   background_color='orange', text_color='black', no_titlebar=True)
             else:
                 sg.popup_error('Nekompletne udaje - dopln a skus znova.',
                                background_color='orange', text_color='black', no_titlebar=True)
-        else:
-            sg.popup_error('Nekompletne udaje - dopln a skus znova.',
-                           background_color='orange', text_color='black', no_titlebar=True)
 
 window.close()
