@@ -342,7 +342,10 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     df_csv_recent.drop(df_csv_recent[df_csv_recent['HPSM Group - JIRA'] == 'Dispečing'].index,
                        inplace=True)
     excel_kontrola_JIRA = report_path_folder + 'kontrola_JIRA_' + current_timestamp + '.xlsx'
-    df_csv_recent.to_excel(excel_kontrola_JIRA)
+    df_csv_recent.to_excel(excel_writer=excel_kontrola_JIRA,
+                           index=False,
+                           sheet_name='TOIS všetky' + str(report_month) + '-' + str(report_year),
+                           freeze_panes=(1, 1))
 
     # 3.4 - merge do spolocneho excelu JIRA + HPSM + report
     df_report = pd.read_excel(report_path, sheet_name=sht_name)
@@ -524,7 +527,10 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
 
     excel_report_name = report_path_folder + 'TOIS_report_created_' + current_timestamp + '.xlsx'
     excel_report_name_short = report_path_folder + 'TOIS_report_created_short_' + current_timestamp + '.xlsx'
-    df_merged_all.to_excel(excel_report_name, index=False, sheet_name=sht_name, freeze_panes=(1, 1))
+    df_merged_all.to_excel(excel_writer=excel_report_name,
+                           index=False,
+                           sheet_name='TOIS všetky' + str(report_month) + '-' + str(report_year),
+                           freeze_panes=(1, 1))
     print("Report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...')
     if to_gui:
         window['MLINE'].update("Report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...\n',
@@ -544,7 +550,10 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
                   'HPSM Issue Type - JIRA', 'MEV ID - JIRA', 'Module - JIRA', 'Open-Closed Time - JIRA',
                   'Open-Resolved Time - JIRA', 'Reopen Counter - JIRA', 'Test Environment - JIRA']
     df_merged_all_short = df_merged_all.drop(cols_extra, axis=1)
-    df_merged_all_short.to_excel(excel_report_name_short, index=False, sheet_name=sht_name, freeze_panes=(1, 1))
+    df_merged_all_short.to_excel(excel_writer=excel_report_name_short,
+                                 index=False,
+                                 sheet_name='TOIS všetky' + str(report_month) + '-' + str(report_year),
+                                 freeze_panes=(1, 1))
     print("Skrateny report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...')
     if to_gui:
         window['MLINE'].update(
