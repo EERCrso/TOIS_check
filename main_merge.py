@@ -7,6 +7,7 @@ import datetime as dt
 import numpy as np
 from openpyxl.utils import get_column_letter
 
+
 # DO TERMINALU NA KOMPILACIU .EXE
 # pyinstaller --hidden-import=pkg_resources.py2_warn --onefile --debug main_merge.py
 
@@ -121,6 +122,10 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     :param hidden_cols: skryt niektore stplce v kompletnom exceli (nepovinne)
     :return: kratky a dlhy spojeny excel subor s incidentami do priecinka odkial sa spusta program
     """
+    # 1.0 - nastavenie vystupneho priecinka pre subory
+    report_path_folder = report_path.split('/')[:-1]
+    report_path_folder = '/'.join(report_path_folder) + '/'
+    current_timestamp = dt.datetime.now().strftime("%Y%m%d_%H_%M_%S")
 
     # 2.0 - EXPORT Z HPSM, UPRAVENY UZ CEZ VBA SKRIPT -> CITATELNEJSIA FORMA
     df_hpsm = pd.read_excel(hpsm_input_path)
@@ -336,10 +341,15 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     df_csv_recent = df_csv_recent[~mask]
     df_csv_recent.drop(df_csv_recent[df_csv_recent['HPSM Group - JIRA'] == 'Dispečing'].index,
                        inplace=True)
-    df_csv_recent.to_excel('kontrola_JIRA_' + dt.datetime.now().strftime("%Y%m%d_%H_%M_%S") + '.xlsx')
+    excel_kontrola_JIRA = report_path_folder + 'kontrola_JIRA_' + current_timestamp + '.xlsx'
+    df_csv_recent.to_excel(excel_kontrola_JIRA)
 
     # 3.4 - merge do spolocneho excelu JIRA + HPSM + report
     df_report = pd.read_excel(report_path, sheet_name=sht_name)
+    try:
+        df_report.drop('Issue key - JIRA', axis=1, inplace=True)
+    except:
+        pass
     df_merged_report = pd.merge(df_report, df_hpsm_new, how='outer',
                                 left_on='Incident ID', right_on='Incident ID')
 
@@ -451,20 +461,20 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
             # update stavu
             df_merged_all.loc[index, 'Status JIRA'] = df_merged_all.loc[index, 'Status - JIRA']
 
-    # 3.10.1 - vytvorenie zoznamu sviatkov z excelu
-    sviatky_list = []
-    workbook_sviatky = opx.load_workbook(filename='SVIATKY_DO_2022.xlsx')
-    sheet_sviatky = workbook_sviatky.active
-    row_sviatky = 1
-
-    while True:
-        if sheet_sviatky.cell(row=row_sviatky, column=1).value:
-            sviatky_list.append(dt.datetime.strptime(sheet_sviatky.cell(row=row_sviatky, column=1).value, '%d.%m.%Y'))
-            row_sviatky += 1
-        else:
-            break
-
-    workbook_sviatky.close()
+    # # 3.10.1 - vytvorenie zoznamu sviatkov z excelu
+    # sviatky_list = []
+    # workbook_sviatky = opx.load_workbook(filename='SVIATKY_DO_2022.xlsx')
+    # sheet_sviatky = workbook_sviatky.active
+    # row_sviatky = 1
+    #
+    # while True:
+    #     if sheet_sviatky.cell(row=row_sviatky, column=1).value:
+    #         sviatky_list.append(dt.datetime.strptime(sheet_sviatky.cell(row=row_sviatky, column=1).value, '%d.%m.%Y'))
+    #         row_sviatky += 1
+    #     else:
+    #         break
+    #
+    # workbook_sviatky.close()
 
     # # TODO - NEPOCITA SPRAVNE
     # # 3.10.2 - vyznacenie uz vyhodnotenych incidentov z minulych mesiacov + doplnenie prazdnych casov
@@ -509,16 +519,19 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     #                     # default SLA splnene
     #                     df_merged_all.loc[index, report_cols[index_rep_col]] = 'Áno'
 
-    # 4.0 - ulozit do .xlsx pre rychly pristup + kontrolu, predtym konverzia na casovy format excelu
-    excel_report_name = 'TOIS_report_created_' + dt.datetime.now().strftime("%Y%m%d_%H_%M_%S") + '.xlsx'
-    excel_report_name_short = 'TOIS_report_created_short_' + dt.datetime.now().strftime("%Y%m%d_%H_%M_%S") + '.xlsx'
+    # 4.0 - ulozit do .xlsx pre rychly pristup na miesto kde je ulozeny HPSM report
+    # + kontrolu, predtym konverzia na casovy format excelu
+
+    excel_report_name = report_path_folder + 'TOIS_report_created_' + current_timestamp + '.xlsx'
+    excel_report_name_short = report_path_folder + 'TOIS_report_created_short_' + current_timestamp + '.xlsx'
     df_merged_all.to_excel(excel_report_name, index=False, sheet_name=sht_name, freeze_panes=(1, 1))
     print("Report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...')
     if to_gui:
-        window['MLINE'].update("Report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...\n', append=True)
+        window['MLINE'].update("Report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...\n',
+                               append=True)
 
     # 4.1 - vytvorit skrateny excel len so stlpcami ako v internom reporte
-    cols_extra = ['Issue ID - JIRA', 'L3 - HPSM', # 'Issue key - JIRA',
+    cols_extra = ['Issue ID - JIRA', 'L3 - HPSM',  # 'Issue key - JIRA',
                   'Label 1 - JIRA',  # 'Label 2 - JIRA', 'Label 3 - JIRA',
                   'Priority - HPSM', 'Priority - JIRA', 'Status - HPSM', 'Status - JIRA', 'Resolution - JIRA',
                   'Assignee - JIRA', 'Assignee HPSM - JIRA', 'Created - JIRA', 'SLT Start time - HPSM',
@@ -534,13 +547,16 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     df_merged_all_short.to_excel(excel_report_name_short, index=False, sheet_name=sht_name, freeze_panes=(1, 1))
     print("Skrateny report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...')
     if to_gui:
-        window['MLINE'].update("Skrateny report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...\n', append=True)
+        window['MLINE'].update(
+            "Skrateny report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...\n', append=True)
 
     # 5.0 - spracovanie vytvoreneho .xlsx spojeneho reportu // opx = openpyxl -> nastroj na pracovanie s xlsx
     workbook = opx.load_workbook(filename=excel_report_name)
     workbook_short = opx.load_workbook(filename=excel_report_name_short)
+    workbook_JIRA = opx.load_workbook(filename=excel_kontrola_JIRA)
     sheet = workbook.active
     sheet_short = workbook_short.active
+    sheet_JIRA = workbook_JIRA.active
 
     # 5.1 - nastavenie auto filtra + autofit sirky buniek
     sheet.auto_filter.ref = "A:BE"
@@ -548,6 +564,9 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
 
     sheet_short.auto_filter.ref = "A:Q"
     auto_format_cell_width(sheet_short)
+
+    sheet_JIRA.auto_filter.ref = "A:Z"
+    auto_format_cell_width(sheet_JIRA)
 
     # 5.2 - skryt pomocne stlpce??
     if hidden_cols:  # nastavenie na zaciatku skriptu
@@ -562,9 +581,10 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
         sheet.column_dimensions['AJ'].hidden = True
         sheet.column_dimensions.group(start='AL', end='BF', hidden=True)
 
-    # 5.X - ulozit subor
+    # 5.X - ulozit subor tam kde je zdrojovy subor s reportom
     workbook.save(filename=excel_report_name)
     workbook_short.save(filename=excel_report_name_short)
+    workbook_JIRA.save(filename=excel_kontrola_JIRA)
     print('Zakladne upravy v spojenom reporte uspesne zrealizovane ...')
     if to_gui:
         window['MLINE'].update('Zakladne upravy v spojenom reporte uspesne zrealizovane ...\n', append=True)
@@ -572,7 +592,7 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     # TODO - filter na zaklade zaciatocneho eDZ - case insensitive?
     # print(str(df_csv['Summary']).startswith('eDZ'))
 
-    return excel_report_name, excel_report_name_short
+    return excel_report_name, excel_report_name_short, excel_kontrola_JIRA
 
 
 # VOLANIE GUI
@@ -581,17 +601,26 @@ sg.change_look_and_feel('Dark Blue 3')  # please make your windows colorful
 # DEBUG MODE - natvrdo adresy suborov v kode po stlaceni tlacidla "RUN"
 debug = False
 
-layout = [
-    [sg.FileBrowse('Load Report', size=(10, 1), file_types=(("Excel Files", ".xlsm"),)), sg.Input(key='path_report')],
-    [sg.Button('Sheet Name', size=(10, 1)), sg.InputText(key='sheet_report')],
-    [sg.FileBrowse('Load JIRA', size=(10, 1), file_types=(("CSV Files", ".csv"),)), sg.Input(key='path_JIRA')],
-    [sg.FileBrowse('Load HPSM', size=(10, 1), file_types=(("Excel Files", ".xlsx"),)), sg.Input(key='path_HPSM')],
-    [sg.Text('Report Year', size=(10, 1)), sg.InputText(key='report_year', size=(5, 1)),
-     sg.Text('Report Month', size=(10, 1)), sg.InputText(key='report_month', size=(5, 1)),
-     sg.Button('RUN', size=(15, 1), button_color=('black', 'green'))],
-    [sg.MLine(size=(60, 8), key='MLINE')]]
+size_inputtext = (200, 1)
 
-window = sg.Window('Merging reports', layout, size=(450, 300))
+layout = [
+    [sg.FileBrowse('Load Report', size=(10, 1), file_types=(("Excel Files", ".xlsm"),)),
+     sg.Input(key='path_report', size=size_inputtext)],
+    [sg.Button('Sheet Name', size=(10, 1)),
+     sg.InputText(key='sheet_report', size=size_inputtext)],
+    [sg.FileBrowse('Load JIRA', size=(10, 1), file_types=(("CSV Files", ".csv"),)),
+     sg.Input(key='path_JIRA', size=size_inputtext)],
+    [sg.FileBrowse('Load HPSM', size=(10, 1), file_types=(("Excel Files", ".xlsx"),)),
+     sg.Input(key='path_HPSM', size=size_inputtext)],
+    [sg.Text('Report Year', size=(10, 1)),
+     sg.InputText(key='report_year', size=(10, 1)),
+     sg.Text('Report Month', size=(10, 1)),
+     sg.InputText(key='report_month', size=(10, 1)),
+     sg.Text('', size=(5, 1)),
+     sg.Button('RUN', size=(15, 1), button_color=('black', 'green'))],
+    [sg.MLine(size=(200, 20), key='MLINE')]]
+
+window = sg.Window('Merging reports', layout, size=(1000, 500))
 
 while True:  # Event Loop
     event, values = window.read()
@@ -630,6 +659,7 @@ while True:  # Event Loop
             window['MLINE'].update('Finalne reporty:\n', append=True)
             window['MLINE'].update(reports[0] + '\n', append=True)
             window['MLINE'].update(reports[1] + '\n', append=True)
+            window['MLINE'].update(reports[2] + '\n', append=True)
 
         else:
             if values['path_report'] and values['sheet_report'] and values['path_JIRA']:
@@ -645,6 +675,7 @@ while True:  # Event Loop
                     window['MLINE'].update('Finalne reporty:\n', append=True)
                     window['MLINE'].update(reports[0] + '\n', append=True)
                     window['MLINE'].update(reports[1] + '\n', append=True)
+                    window['MLINE'].update(reports[2] + '\n', append=True)
 
                 else:
                     sg.popup_error('Nekompletne udaje - dopln a skus znova.',
