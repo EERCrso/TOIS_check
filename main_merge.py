@@ -630,7 +630,7 @@ layout = [
      sg.Button('RUN', size=(15, 1), button_color=('black', 'green'))],
     [sg.MLine(size=(200, 20), key='MLINE')]]
 
-window = sg.Window('Merging reports', layout, icon=r'merge_icon.ico', size=(1000, 500)).read(close=True)
+window = sg.Window('Merging reports', layout, icon=r'merge_icon.ico', size=(1000, 500))
 
 while True:  # Event Loop
     event, values = window.read()
