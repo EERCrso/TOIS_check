@@ -331,7 +331,7 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
         if value is np.nan:
             df_csv.loc[index, 'Custom field (Ext ID)'] = df_csv.loc[index, 'Summary - JIRA'][:8]
 
-    # 3.3.1 - vytvorit zoznam incidentov otvorenych v reportovanom mesiaci a neskor
+    # 3.3.1 - vytvorit zoznam incidentov vytvorenych v reportovanom mesiaci a neskor
     opened_recently = dt.datetime(year=int(report_year), month=int(report_month), day=1)
     df_csv_recent = df_csv[df_csv['Created - JIRA'] > opened_recently]
 
@@ -344,7 +344,7 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     excel_kontrola_JIRA = report_path_folder + 'kontrola_JIRA_' + current_timestamp + '.xlsx'
     df_csv_recent.to_excel(excel_writer=excel_kontrola_JIRA,
                            index=False,
-                           sheet_name='TOIS všetky' + str(report_month) + '-' + str(report_year),
+                           sheet_name='TOIS všetky ' + str(report_month.zfill(2)) + '-' + str(report_year),
                            freeze_panes=(1, 1))
 
     # 3.4 - merge do spolocneho excelu JIRA + HPSM + report
@@ -529,7 +529,7 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     excel_report_name_short = report_path_folder + 'TOIS_report_created_short_' + current_timestamp + '.xlsx'
     df_merged_all.to_excel(excel_writer=excel_report_name,
                            index=False,
-                           sheet_name='TOIS všetky' + str(report_month) + '-' + str(report_year),
+                           sheet_name='TOIS všetky ' + str(report_month.zfill(2)) + '-' + str(report_year),
                            freeze_panes=(1, 1))
     print("Report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...')
     if to_gui:
@@ -552,7 +552,7 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     df_merged_all_short = df_merged_all.drop(cols_extra, axis=1)
     df_merged_all_short.to_excel(excel_writer=excel_report_name_short,
                                  index=False,
-                                 sheet_name='TOIS všetky' + str(report_month) + '-' + str(report_year),
+                                 sheet_name='TOIS všetky ' + str(report_month.zfill(2)) + '-' + str(report_year),
                                  freeze_panes=(1, 1))
     print("Skrateny report JIRA + HPSM pre TOIS uspesne ulozeny ako " + excel_report_name + ' ...')
     if to_gui:
@@ -574,8 +574,9 @@ def merge_exports(report_path, csv_input_path, hpsm_input_path, sht_name, report
     sheet_short.auto_filter.ref = "A:Q"
     auto_format_cell_width(sheet_short)
 
-    sheet_JIRA.auto_filter.ref = "A:Z"
+    sheet_JIRA.auto_filter.ref = "A:Y"
     auto_format_cell_width(sheet_JIRA)
+    sheet_JIRA.column_dimensions.group(start='M', end='M', hidden=True)
 
     # 5.2 - skryt pomocne stlpce??
     if hidden_cols:  # nastavenie na zaciatku skriptu
